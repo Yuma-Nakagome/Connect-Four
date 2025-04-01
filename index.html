@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>四目並べ</title>
+<style>
+body {
+    font-family: sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+}
+
+.game-container {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 {
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+.score-area {
+    display: flex;
+    justify-content: space-around;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.score-box {
+    background-color: #f9f9f9;
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+}
+.score-box.computer { background-color: #ffe0e0; }
+.score-box.draw { background-color: #e0f7fa; }
+.score-box.player { background-color: #e8f5e9; }
+
+.game-board {
+    display: grid;
+    grid-template-columns: repeat(7, 50px);
+    grid-template-rows: repeat(6, 50px);
+    border: 1px solid #ccc;
+}
+
+.cell {
+    width: 50px;
+    height: 50px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 2em;
+    cursor: pointer;
+}
+
+.cell:hover {
+    background-color: #f0f0f0;
+}
+
+.cell.player-o::before {
+    content: '○';
+    color: blue; /* プレイヤーOの色 */
+}
+
+.cell.player-x::before {
+    content: '×';
+    color: red; /* プレイヤーXの色 */
+}
+
+
+.button-area {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    color: white;
+    background-color: #2196F3;
+    cursor: pointer;
+}
+
+button#reset-button {
+    background-color: #2196F3;
+}
+
+button#option-button {
+    background-color: #00BCD4;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+</style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>四目並べ</h1>
+
+    <div class="score-area">
+        <div class="score-box computer">
+            コンピュータ<br>
+            <span id="computer-score">0</span>
+        </div>
+        <div class="score-box draw">
+            引き分け<br>
+            <span id="draw-score">0</span>
+        </div>
+        <div class="score-box player">
+            プレイヤー<br>
+            <span id="player-score">0</span>
+        </div>
+    </div>
+
+    <div class="game-board" id="gameBoard"></div>
+
+    <div class="button-area">
+        <button id="reset-button">ゲームをリセット</button>
+        <button id="option-button">オプション</button>
+    </div>
+</div>
+
+<script>
+const gameBoardElement = document.getElementById('gameBoard');
+const computerScoreElement = document.getElementById('computer-score');
+const drawScoreElement = document.getElementById('draw-score');
+const playerScoreElement = document.getElementById('player-score');
+const resetButton = document.getElementById('reset-button');
+const optionButton = document.getElementById('option-button');
+
+let gameBoard = [];
+const rows = 6;
+const cols = 7;
+let currentPlayer = 'player-o'; // プレイヤーOが先攻
+let gameActive = true;
+let computerWins = 0;
+let playerWins = 0;
+let draws = 0;
+
+function initializeBoard() {
+    gameBoard = Array.from({ length: rows }, () => Array(cols).fill(null));
+    gameBoardElement.innerHTML = ''; // ボードをクリア
+    gameActive = true;
+    currentPlayer = 'player-o';
+
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            cell.dataset.row = r;
+            cell.dataset.col = c;
+            cell.addEventListener('click', handleCellClick);
+            gameBoardElement.appendChild(cell);
+        }
+    }
+}
+
+function handleCellClick(event) {
+    if (!gameActive) return;
+
+    const cell = event.target;
+    const row = parseInt(cell.dataset.row);
+    const col = parseInt(cell.dataset.col);
+
+    if (gameBoard[row][col] === null) {
+        // 一番下の行から埋めるロジック
+        let actualRow = rows - 1;
+        while (actualRow > 0 && gameBoard[actualRow][col] !== null) {
+            actualRow--;
+        }
+
+        if (gameBoard[actualRow][col] === null) {
+            gameBoard[actualRow][col] = currentPlayer;
+            const targetCell = gameBoardElement.children[actualRow * cols + col];
+            targetCell.classList.add(currentPlayer);
+
+            if (checkWin(actualRow, col, currentPlayer)) {
+                gameActive = false;
+                if (currentPlayer === 'player-o') {
+                    playerWins++;
+                    playerScoreElement.textContent = playerWins;
+                    alert('プレイヤーの勝ち！');
+                } else {
+                    computerWins++;
+                    computerScoreElement.textContent = computerWins;
+                    alert('コンピュータの勝ち！');
+                }
+            } else if (isBoardFull()) {
+                gameActive = false;
+                draws++;
+                drawScoreElement.textContent = draws;
+                alert('引き分け！');
+            } else {
+                currentPlayer = (currentPlayer === 'player-o') ? 'player-x' : 'player-o';
+                if (currentPlayer === 'player-x') {
+                    setTimeout(computerTurn, 500); // コンピュータのターンを少し遅らせる
+                }
+            }
+        }
+    }
+}
+
+function computerTurn() {
+    if (!gameActive) return;
+
+    // 簡単なAI：ランダムな列を選択
+    let bestMoveCol = findBestMove(); // より賢いAIを使用する場合
+
+    if (bestMoveCol === -1) { // ベストな手が見つからない場合はランダムに
+        let validCols = [];
+        for (let c = 0; c < cols; c++) {
+            if (gameBoard[0][c] === null) {
+                validCols.push(c);
+            }
+        }
+        bestMoveCol = validCols[Math.floor(Math.random() * validCols.length)];
+    }
+
+    let actualRow = rows - 1;
+    while (actualRow > 0 && gameBoard[actualRow][bestMoveCol] !== null) {
+        actualRow--;
+    }
+
+    if (gameBoard[actualRow][bestMoveCol] === null) {
+        gameBoard[actualRow][bestMoveCol] = currentPlayer;
+        const targetCell = gameBoardElement.children[actualRow * cols + bestMoveCol];
+        targetCell.classList.add(currentPlayer);
+
+        if (checkWin(actualRow, bestMoveCol, currentPlayer)) {
+            gameActive = false;
+            computerWins++;
+            computerScoreElement.textContent = computerWins;
+            alert('コンピュータの勝ち！');
+        } else if (isBoardFull()) {
+            gameActive = false;
+            draws++;
+            drawScoreElement.textContent = draws;
+            alert('引き分け！');
+        } else {
+            currentPlayer = (currentPlayer === 'player-o') ? 'player-x' : 'player-o';
+        }
+    }
+}
+
+function findBestMove() {
+    // TODO: より賢いAIを実装 (例: ミニマックス法)
+    // 簡単な例として、勝利またはブロックできる場所を優先するAI
+    for (let c = 0; c < cols; c++) {
+        let r = getNextOpenRow(c);
+        if (r !== -1) {
+            gameBoard[r][c] = 'player-x'; // 試しにコンピュータの手を置く
+            if (checkWin(r, c, 'player-x')) {
+                gameBoard[r][c] = null; // 盤面を元に戻す
+                return c; // 勝利できる手を返す
+            }
+            gameBoard[r][c] = null; // 盤面を元に戻す
+        }
+    }
+
+    // プレイヤーの勝利を阻止する手を試す
+    for (let c = 0; c < cols; c++) {
+        let r = getNextOpenRow(c);
+        if (r !== -1) {
+            gameBoard[r][c] = 'player-o'; // 試しにプレイヤーの手を置く
+            if (checkWin(r, c, 'player-o')) {
+                gameBoard[r][c] = null; // 盤面を元に戻す
+                return c; // プレイヤーの勝利を阻止する手を返す
+            }
+            gameBoard[r][c] = null; // 盤面を元に戻す
+        }
+    }
+    return -1; // ベストな手が見つからない場合はランダムに選択させる
+}
+
+function getNextOpenRow(col) {
+    for (let r = rows - 1; r >= 0; r--) {
+        if (gameBoard[r][col] === null) {
+            return r;
+        }
+    }
+    return -1; // 列が一杯
+}
+
+
+function checkWin(row, col, player) {
+    // 水平方向
+    let count = 0;
+    for (let c = 0; c < cols; c++) {
+        if (gameBoard[row][c] === player) {
+            count++;
+        } else {
+            count = 0;
+        }
+        if (count >= 4) return true;
+    }
+
+    // 垂直方向
+    count = 0;
+    for (let r = 0; r < rows; r++) {
+        if (gameBoard[r][col] === player) {
+            count++;
+        } else {
+            count = 0;
+        }
+        if (count >= 4) return true;
+    }
+
+    // 斜め方向 (右下がり)
+    count = 0;
+    for (let i = -3; i <= 3; i++) {
+        const r = row + i;
+        const c = col + i;
+        if (r >= 0 && r < rows && c >= 0 && c < cols && gameBoard[r][c] === player) {
+            count++;
+        } else {
+            count = 0;
+        }
+        if (count >= 4) return true;
+    }
+
+    // 斜め方向 (左下がり)
+    count = 0;
+    for (let i = -3; i <= 3; i++) {
+        const r = row + i;
+        const c = col - i;
+        if (r >= 0 && r < rows && c >= 0 && c < cols && gameBoard[r][c] === player) {
+            count++;
+        } else {
+            count = 0;
+        }
+        if (count >= 4) return true;
+    }
+
+    return false;
+}
+
+function isBoardFull() {
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            if (gameBoard[r][c] === null) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+resetButton.addEventListener('click', initializeBoard);
+optionButton.addEventListener('click', () => {
+    alert('オプション機能はまだ実装されていません。');
+});
+
+initializeBoard(); // ゲーム開始時にボードを初期化
+</script>
+
+</body>
+</html>
